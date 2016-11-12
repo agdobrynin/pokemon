@@ -1,6 +1,4 @@
-# Pokemon task with Skill-Branch.ru
-# Babel Starter Kit - for Pokemon API
-
+# Pokemon task with Skill-Branch.ru (Babel Starter Kit)
 Используя API https://pokeapi.co/ необходимо вывести список самых тяжелых покемонов. Предпологаемая работа с API:
 
 - Сделать запрос на https://pokeapi.co/api/v2/pokemon, получить первых 20 покемонов
