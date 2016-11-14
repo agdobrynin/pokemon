@@ -44,7 +44,7 @@
     "rollup-plugin-babel": "^2.6.1",
     "nodemon": "^1.11.0",
     "sinon": "^2.0.0-pre.3"
-  },
+  }, 
   "scripts": {
     "lint": "eslint src test tools",
     "test": "mocha --compilers js:babel-register",
