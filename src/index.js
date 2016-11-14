@@ -7,6 +7,7 @@ var _ = require('lodash');
 var app = express();
 
 const __DEV__ = true;
+const __DEV_MAX_COUNT_POKEMONS__ =5;
 
 const BaseURL = 'https://pokeapi.co/api/v2';
 const PokemonsUrl=`${BaseURL}/pokemon`;
@@ -49,8 +50,7 @@ async function getPokemon( url ){
 app.get('/', async (req, res) => {
   try{
     const PokemonsInfo = await getAllPokemons(PokemonsUrl);
-    //
-    const PokemonsPromises = PokemonsInfo.slice(0, 100).map(info => {
+    const PokemonsPromises = PokemonsInfo.slice(0, __DEV__?__DEV_MAX_COUNT_POKEMONS__:PokemonsInfo.length).map(info => {
       return getPokemon(info.url);
     });
 
