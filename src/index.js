@@ -23,7 +23,7 @@ async function getAllPokemons( url, i=0 ){
   const response = await fetch(url);
   const page = await response.json();
   const pokemons = page.results;
-  if( __DEV__ && i>3){
+  if( __DEV__ && i>=1 ){
     return pokemons;
   }
   if( page.next ){
