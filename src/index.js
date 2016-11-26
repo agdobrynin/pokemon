@@ -1,17 +1,19 @@
-var express = require('express');
+let express = require('express');
+import cors from 'cors';
 require('es6-promise').polyfill();
 require('isomorphic-fetch');
-var Promise = require('bluebird');
-var _ = require('lodash');
+let Promise = require('bluebird');
+let _ = require('lodash');
 
-var app = express();
+const app = express();
+app.use(cors());
 
 const __DEV__ = true;
 const __DEV_MAX_COUNT_POKEMONS__ =5;
 
 const BaseURL = 'https://pokeapi.co/api/v2';
 const PokemonsUrl=`${BaseURL}/pokemon`;
-const PokemonFields = ['id', 'name', 'weight'];
+const PokemonFields = ['id', 'name', 'height', 'weight'];
 /**
  * [getAllPokemons description]
  * @param  {[type]}  url   [description]
