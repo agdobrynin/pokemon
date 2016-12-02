@@ -72,14 +72,7 @@ app.get('/:metrica?', async (req, res, next) => {
   let limit = req.query.limit || 20,
       offset = req.query.offset || 0,
       answer = [];
-  /*
-  fat - max(pokemon.weight / pokemon.height)
-  angular - min(pokemon.weight / pokemon.height)
-  heavy - max(pokemon.weight)
-  light - min(pokemon.weight)
-  huge - max(pokemon.height)
-  micro - min(pokemon.height)
-   */
+
   switch (req.params.metrica) {
     case 'angular':
         answer = _.orderBy(Pokemons, [(p)=>{return p.weight / p.height}], ['ask', 'ask']);
