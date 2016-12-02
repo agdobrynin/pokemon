@@ -65,7 +65,7 @@ async function getPokemon( url ){
   return doRequest();
 }
 
-let MyPages, Pokemons=[];
+let Pokemons=[];
 
 app.get('/:metrica?', async (req, res, next) => {
   //limit & offset query params
@@ -136,7 +136,5 @@ app.listen(3000, async () => {
     fs.writeFileSync(FilePokemons, JSON.stringify(Pokemons));
      console.log(`Write to cache file ${FilePokemons}\nFound ${Object.keys(Pokemons).length} pokemons`);
   }
-  //Sorting by name
-  Pokemons=_.sortBy(Pokemons,'name');
   console.log('>>>>> Your app listening on port 3000 <<<<<<');
 });
