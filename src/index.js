@@ -1,76 +1,149 @@
-let express = require('express');
+import express from 'express';
 import cors from 'cors';
+import _ from 'lodash';
+import fs from 'fs';
+import Promise from 'bluebird';
 require('es6-promise').polyfill();
 require('isomorphic-fetch');
-let Promise = require('bluebird');
-let _ = require('lodash');
 
 const app = express();
 app.use(cors());
 
-const __DEV__ = true;
-const __DEV_MAX_COUNT_POKEMONS__ =5;
-
 const BaseURL = 'https://pokeapi.co/api/v2';
 const PokemonsUrl=`${BaseURL}/pokemon`;
-const PokemonFields = ['id', 'name', 'height', 'weight'];
-/**
- * [getAllPokemons description]
- * @param  {[type]}  url   [description]
- * @param  {Number}  [i=0] [description]
- * @return {Promise}       [description]
- */
-async function getAllPokemons( url, i=0 ){
+const FilePokemons = __dirname+'/data/Pokemons.json';
+const FilePages  = __dirname+'/data/PokemonPages.json';
+const __RETRY_sec__=20;
 
-  const response = await fetch(url);
-  const page = await response.json();
-  const pokemons = page.results;
-  if( __DEV__ && i>=1 ){
-    return pokemons;
+async function getAllPokemons( url ){
+  let retryAfter = __RETRY_sec__;
+  const doRequest = async () => {
+    try{
+      console.log('All pages url', url);
+      const res = await fetch(url);
+      if (res.status > 400) {
+        retryAfter=parseInt(res.headers.get('retry-after'));
+        retryAfter = retryAfter? retryAfter : __RETRY_sec__;
+        throw new Error(`Bad response. Status=${res.status} and retry-after=${res.headers.get('retry-after')}`);
+      }
+      const page = await res.json();
+      const pokemons = page.results;
+      if( page.next ){
+        const pokemons2 = await getAllPokemons( page.next+'&limit='+page.count );
+        return [ ...pokemons, ...pokemons2];
+      }
+      return pokemons;
+    }catch (error){
+      console.error(error.message,'=====>>>>',`Expected available in ${retryAfter}sec from ${url}`);
+      setTimeout(doRequest, retryAfter*1000 );
+    }
   }
-  if( page.next ){
-    const pokemons2 = await getAllPokemons( page.next, i +1 );
-    return [
-      ...pokemons,
-      ...pokemons2
-    ]
-  }
-  return pokemons;
+  return doRequest();
 }
-/**
- * [getAllPokemon description]
- * @param  {[type]}  id [description]
- * @return {Promise}    [description]
- */
+
 async function getPokemon( url ){
-  const response = await fetch(url);
-  const pokemon = await response.json();
-  return pokemon;
+  let retryAfter = __RETRY_sec__;
+  const doRequest = async () => {
+    try {
+      console.log('Loading pokemon from ', url);
+      let res = await fetch(url);
+      // retry-after:278, status:429
+      if (res.status > 400) {
+        retryAfter=parseInt(res.headers.get('retry-after'));
+        retryAfter = retryAfter? retryAfter : __RETRY_sec__;
+        throw new Error(`Bad response. Status=${res.status} and retry-after=${res.headers.get('retry-after')}`);
+      }
+      let data = await res.json();
+      let pokemon = {id: data.id, height: data.height, weight: data.weight, name: data.name};
+      console.log('>>>>>>>>>> Get pokemon', pokemon);
+      return pokemon;
+    }catch (error){
+      console.error(error.message,'=====>>>>',`Expected available in ${retryAfter}sec from ${url}`);
+      setTimeout(doRequest, retryAfter*1000);
+    }
+  }
+  return doRequest();
 }
 
-// index page
-app.get('/', async (req, res) => {
-  try{
-    const PokemonsInfo = await getAllPokemons(PokemonsUrl);
-    const PokemonsPromises = PokemonsInfo.slice(0, __DEV__?__DEV_MAX_COUNT_POKEMONS__:PokemonsInfo.length).map(info => {
-      return getPokemon(info.url);
-    });
+let MyPages, Pokemons=[];
 
-    const PokemonsFull = await Promise.all(PokemonsPromises);
-    const pokemons = PokemonsFull.map( (pokemon) => {
-      return _.pick(pokemon, PokemonFields);
-    });
-
-    const SortPokemons = _.sortBy(pokemons, pokemon => -pokemon.weight);
-
-    return res.json(SortPokemons);
-
-  }catch(err){
-    console.log(err);
-    return res.json({ err });
+app.get('/:metrica?', async (req, res, next) => {
+  //limit & offset query params
+  let limit = req.query.limit || 20,
+      offset = req.query.offset || 0,
+      answer = [];
+  /*
+  fat - max(pokemon.weight / pokemon.height)
+  angular - min(pokemon.weight / pokemon.height)
+  heavy - max(pokemon.weight)
+  light - min(pokemon.weight)
+  huge - max(pokemon.height)
+  micro - min(pokemon.height)
+   */
+  switch (req.params.metrica) {
+    case 'angular':
+        answer = _.orderBy(Pokemons, [(p)=>{return p.weight / p.height}], ['ask', 'ask']);
+      break;
+    case 'fat':
+        answer = _.orderBy(Pokemons, [(p)=>{return p.weight / p.height}], ['desc', 'ask']);
+        break;
+    case 'heavy':
+        answer = _.orderBy(Pokemons,["weight", "name"], ["desc", "asc"]);
+        break;
+    case 'light':
+        answer = _.orderBy(Pokemons,["weight", "name"], ["asc", "asc"]);
+        break;
+    case 'huge':
+      answer = _.orderBy(Pokemons,["height", "name"], ["desc", "asc"]);
+      break;
+    case 'micro':
+      answer = _.orderBy(Pokemons,["height", "name"], ["asc", "asc"]);
+      break;
+    case undefined:
+      answer = _.sortBy(Pokemons,'name');
+      break;
+    default:
+      return res.status(404).send("Not Found");
   }
+  res.json( answer.slice(offset, (+offset + +limit)).map( (p)=>{return p.name} ) );
 });
 
-app.listen(3000, () => {
-  console.log('Your app listening on port 3000 ...');
+app.listen(3000, async () => {
+  //Preload data pokemon's pages
+  let Pages;
+  try {
+    Pages=JSON.parse(fs.readFileSync(FilePages));
+    console.log(`Read from file ${FilePages}\nFound ${Object.keys(Pages).length} pages`);
+  } catch (e) {
+    console.log(`${e}\nCan't read from file ${FilePages}!\n`);
+  }
+
+  if(Object.keys(Pages).length == 0){
+    Pages = await getAllPokemons(PokemonsUrl);
+    fs.writeFileSync(FilePages, JSON.stringify(Pages));
+    console.log(`Write to cache file ${FilePages}`);
+  }
+
+  //Preload data pokemons
+  try {
+    Pokemons=JSON.parse(fs.readFileSync(FilePokemons));
+    console.log(`Read from file ${FilePokemons}\nFound ${Object.keys(Pokemons).length} pokemons`);
+  } catch (e) {
+    console.log(`${e}\nCan't read from file ${FilePokemons}!\n`);
+  }
+
+  if(Object.keys(Pokemons).length < Object.keys(Pages).length){
+    console.log('Load from API pokemons');
+    let pokemom;
+    for(let i=0, c=Object.keys(Pages).length; i<c; i++){
+      pokemom = await getPokemon(Pages[i].url);
+      Pokemons.push(pokemom);
+    }
+
+    fs.writeFileSync(FilePokemons, JSON.stringify(Pokemons));
+     console.log(`Write to cache file ${FilePokemons}\nFound ${Object.keys(Pokemons).length} pokemons`);
+  }
+  //Sorting by name
+  Pokemons=_.sortBy(Pokemons,'name');
+  console.log('>>>>> Your app listening on port 3000 <<<<<<');
 });

@@ -27,6 +27,7 @@
     "cors": "^2.8.1",
     "es6-promise": "^4.0.5",
     "express": "^4.14.0",
+    "fetch-retry": "^1.0.3",
     "isomorphic-fetch": "^2.2.1",
     "lodash": "^4.17.2"
   },
@@ -60,7 +61,7 @@
     "build": "node tools/build",
     "prepublish": "npm run build",
     "publish:docs": "easystatic deploy docs --repo kriasoft/babel-starter-kit",
-    "dev": "nodemon --exec babel-node -- src/index.js",
+    "dev": "nodemon --exec babel-node --ignore src/data/* -- src/index.js",
     "start": "easystatic start docs"
   }
 }
